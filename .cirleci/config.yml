@@ -1,0 +1,55 @@
+# Versi konfigurasi CircleCI
+version: 2.1
+
+# Mendefinisikan pekerjaan (jobs)
+jobs:
+  # Nama pekerjaan: build-and-run-npm-project
+  build-and-run-npm-project:
+    # Menggunakan image Docker cimg/node yang sudah termasuk Node.js dan npm
+    docker:
+      - image: cimg/node:20.11 # Anda bisa mengganti versi Node.js sesuai kebutuhan, contoh: cimg/node:18.18
+
+    # Langkah-langkah yang akan dijalankan dalam pekerjaan ini
+    steps:
+      # Checkout kode dari repositori Anda
+      - checkout
+
+      # Mengembalikan cache node_modules jika ada (mempercepat instalasi)
+      # Kunci cache dibuat berdasarkan hash file package-lock.json atau yarn.lock
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "package-lock.json" }}
+            - v1-dependencies- # Fallback untuk cache sebelumnya
+
+      # Menjalankan perintah npm install untuk menginstal semua dependensi proyek
+      - run:
+          name: Install NPM Dependencies
+          command: npm install
+
+      # Menyimpan cache node_modules untuk build berikutnya
+      # Ini akan menyimpan folder node_modules jika file package-lock.json tidak berubah
+      - save_cache:
+          paths:
+            - node_modules
+          key: v1-dependencies-{{ checksum "package-lock.json" }}
+
+      # Menjalankan perintah npm start untuk memulai aplikasi Anda
+      # Perhatian: Jika ini adalah server, perintah ini akan terus berjalan dan pekerjaan CI akan "hang"
+      # kecuali Anda menghentikannya atau menjalankannya di latar belakang untuk tujuan pengujian.
+      # Untuk CI, biasanya Anda akan menjalankan 'npm test' atau 'npm build' lalu deploy.
+      - run:
+          name: Start NPM Project
+          command: npm start
+
+# Mendefinisikan alur kerja (workflows) untuk menjalankan pekerjaan Anda
+workflows:
+  # Nama alur kerja: npm-build-and-start
+  npm-build-and-start:
+    jobs:
+      # Menjalankan pekerjaan build-and-run-npm-project
+      - build-and-run-npm-project:
+          # Filter untuk menentukan kapan pekerjaan ini akan berjalan
+          # Contoh ini akan berjalan hanya pada branch 'main'
+          filters:
+            branches:
+              only: main # Ganti 'main' dengan nama branch utama Anda (misalnya: master, develop)
