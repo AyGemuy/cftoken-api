@@ -1,0 +1,15 @@
+<script>
+  let token = null
+  async function waitForToken() {
+    while (!token) {
+      try { token = window.turnstile.getResponse() } catch (e) {}
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    var c = document.createElement('input');
+    c.type = 'hidden';
+    c.name = 'cf-response';
+    c.value = token;
+    document.body.appendChild(c);
+  }
+  waitForToken()
+</script>
