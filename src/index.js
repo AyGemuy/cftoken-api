@@ -5,24 +5,41 @@ const bodyParser = require("body-parser");
 const authToken = process.env.authToken || null;
 const cors = require("cors");
 const reqValidate = require("./module/reqValidate");
+const axios = require("axios");
+
 global.browserLength = 0;
 global.browserLimit = Number(process.env.browserLimit) || 20;
 global.timeOut = Number(process.env.timeOut || 6e6);
+
+app.use(cors());
 app.use(bodyParser.json({}));
 app.use(bodyParser.urlencoded({
   extended: true
 }));
-app.use(cors());
-if (process.env.NODE_ENV !== "development") {
-  let server = app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
-  });
+
+async function getIPv4Address() {
   try {
-    server.timeout = global.timeOut;
-  } catch (e) {}
+    const response = await axios.get('https://api.ipify.org?format=json');
+    return response.data.ip;
+  } catch (error) {
+    console.error('Failed to fetch IPv4 address:', error.message);
+    return null;
+  }
 }
+
+async function getIPv6Address() {
+  try {
+    const response = await axios.get('https://api64.ipify.org?format=json');
+    return response.data.ip;
+  } catch (error) {
+    console.error('Failed to fetch IPv6 address:', error.message);
+    return null;
+  }
+}
+
 if (process.env.SKIP_LAUNCH != "true") require("./module/createPagepool");
 if (process.env.SKIP_LAUNCH != "true") require("./module/createBrowser");
+
 const getSource = require("./endpoints/getSource");
 const {
   getPageTurnstileMin,
@@ -33,6 +50,8 @@ const solveRecaptchaV3 = require("./endpoints/solveRecaptcha.v3");
 const solveRecaptchaV3Enterprise = require("./endpoints/solveRecaptcha.v3.enterprise");
 const wafSession = require("./endpoints/wafSession");
 const getVercel = require("./endpoints/getVercel");
+
+
 app.post("/cf-clearance-scraper", async (req, res) => {
   try {
     const data = req.body;
@@ -161,6 +180,7 @@ app.post("/cf-clearance-scraper", async (req, res) => {
     res.status(result.code ?? 504).send(err.msg);
   }
 });
+
 app.post("/cf-clearance-scraper/addPagePool", async (req, res) => {
   try {
     const data = req.body;
@@ -201,6 +221,7 @@ app.post("/cf-clearance-scraper/addPagePool", async (req, res) => {
     res.status(result.code ?? 504).send(err.message);
   }
 });
+
 app.post("/cf-clearance-scraper/removePagePool", async (req, res) => {
   try {
     const data = req.body;
@@ -238,14 +259,36 @@ app.post("/cf-clearance-scraper/removePagePool", async (req, res) => {
     res.status(result.code ?? 504).send(result);
   }
 });
+
 app.use((req, res) => {
   res.status(404).json({
     code: 404,
     message: "Not Found"
   });
 });
-if (process.env.NODE_ENV == "development") module.exports = app;
+
 process.on("uncaughtException", function(err) {
   console.log(err);
   console.log("No worries,still working on~~~");
 });
+
+if (process.env.NODE_ENV !== "development") {
+  let server = app.listen(port, async () => {
+    console.log(`Server running on port ${port}`);
+
+    const ipv4 = await getIPv4Address();
+    if (ipv4) {
+      console.log(`Server IPv4 address: ${ipv4}`);
+    }
+
+    const ipv6 = await getIPv6Address();
+    if (ipv6) {
+      console.log(`Server IPv6 address: ${ipv6}`);
+    }
+  });
+  try {
+    server.timeout = global.timeOut;
+  } catch (e) {}
+}
+
+if (process.env.NODE_ENV == "development") module.exports = app;
